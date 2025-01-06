@@ -4,7 +4,7 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.core.security import get_password_hash, verify_password
-from app.models import Item, ItemCreate, User, UserCreate, UserUpdate
+from app.models import Item, ItemCreate, User, UserCreate, UserUpdate, Server
 
 
 def create_user(*, session: Session, user_create: UserCreate) -> User:
@@ -52,3 +52,28 @@ def create_item(*, session: Session, item_in: ItemCreate, owner_id: uuid.UUID) -
     session.commit()
     session.refresh(db_item)
     return db_item
+
+
+def get_server_by_ip(session: Session, ip_address: str) -> Server | None:
+    statement = select(Server).where(Server.ip_address == ip_address)
+    return session.exec(statement).first()
+
+
+def create_server(session: Session, server_data: dict) -> Server:
+    server = Server(**server_data)
+    session.add(server)
+    session.commit()
+    session.refresh(server)
+    return server
+
+
+def get_servers(session: Session, skip: int = 0, limit: int = 100) -> list[Server]:
+    statement = select(Server).offset(skip).limit(limit)
+    return session.exec(statement).all()
+
+
+def delete_server_by_id(session: Session, server_id: str) -> None:
+    server = session.get(Server, server_id)
+    if server:
+        session.delete(server)
+        session.commit()

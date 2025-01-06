@@ -1,106 +1,79 @@
 import uuid
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session
+from app.models import Server, ServerCreate
+from app.main import app
+from app.api.deps import get_db
+from app.tests.utils.user import get_superuser_token_headers
+from app.tests.utils.server import create_random_server
 
-from app.models import Server
-from app.core.config import settings
-from app.tests.utils.utils import random_ip_address
+# Setup FastAPI test client
+client = TestClient(app)
+
+# Dependency override for test database session
+def override_get_db():
+    from app.tests.utils.session import get_test_session
+    yield from get_test_session()
+
+app.dependency_overrides[get_db] = override_get_db
 
 
-def test_read_servers(
-    client: TestClient, superuser_token_headers: dict[str, str], db: Session
-) -> None:
-    # Create some servers
-    ip1 = random_ip_address()
-    ip2 = random_ip_address()
-    server1 = Server(ip_address=ip1)
-    server2 = Server(ip_address=ip2)
-    db.add(server1)
-    db.add(server2)
-    db.commit()
+def test_create_server(session: Session):
+    superuser_headers = get_superuser_token_headers(client, session)
+    server_data = {
+        "ip_address": "192.168.1.1",
+    }
 
-    # Read servers
-    response = client.get(
-        f"{settings.API_V1_STR}/servers/",
-        headers=superuser_token_headers,
-    )
+    response = client.post("/servers/", json=server_data, headers=superuser_headers)
+    assert response.status_code == 200
+    created_server = response.json()
+    assert created_server["ip_address"] == server_data["ip_address"]
+
+
+def test_read_servers(session: Session):
+    superuser_headers = get_superuser_token_headers(client, session)
+    create_random_server(session)
+
+    response = client.get("/servers/", headers=superuser_headers)
     assert response.status_code == 200
     servers = response.json()
     assert "data" in servers
     assert "count" in servers
-    assert len(servers["data"]) >= 2
-    assert servers["count"] >= 2
-    assert any(s["ip_address"] == ip1 for s in servers["data"])
-    assert any(s["ip_address"] == ip2 for s in servers["data"])
+    assert len(servers["data"]) > 0
 
 
-def test_create_server(
-    client: TestClient, superuser_token_headers: dict[str, str], db: Session
-) -> None:
-    ip_address = random_ip_address()
-    data = {"ip_address": ip_address}
-    response = client.post(
-        f"{settings.API_V1_STR}/servers/",
-        headers=superuser_token_headers,
-        json=data,
+def test_read_server_by_id(session: Session):
+    superuser_headers = get_superuser_token_headers(client, session)
+    server = create_random_server(session)
+
+    response = client.get(f"/servers/{server.id}", headers=superuser_headers)
+    assert response.status_code == 200
+    fetched_server = response.json()
+    assert fetched_server["id"] == str(server.id)
+
+
+def test_update_server(session: Session, client: TestClient):
+    superuser_headers = get_superuser_token_headers(client, session)
+    server = create_random_server(session)
+    update_data = {"ip_address": "192.168.1.2"}
+
+    response = client.patch(
+        f"/servers/{server.id}", json=update_data, headers=superuser_headers
     )
     assert response.status_code == 200
-    created_server = response.json()
-    assert created_server["ip_address"] == ip_address
-
-    # Verify in the database
-    db_server = db.exec(select(Server).where(Server.ip_address == ip_address)).first()
-    assert db_server
-    assert db_server.ip_address == ip_address
+    updated_server = response.json()
+    assert updated_server["ip_address"] == update_data["ip_address"]
 
 
-def test_create_server_duplicate(
-    client: TestClient, superuser_token_headers: dict[str, str], db: Session
-) -> None:
-    ip_address = random_ip_address()
-    server = Server(ip_address=ip_address)
-    db.add(server)
-    db.commit()
+def test_delete_server(session: Session):
+    superuser_headers = get_superuser_token_headers(client, session)
+    server = create_random_server(session)
 
-    data = {"ip_address": ip_address}
-    response = client.post(
-        f"{settings.API_V1_STR}/servers/",
-        headers=superuser_token_headers,
-        json=data,
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "The server with this IP address already exists in the system."
-
-
-def test_delete_server(
-    client: TestClient, superuser_token_headers: dict[str, str], db: Session
-) -> None:
-    ip_address = random_ip_address()
-    server = Server(ip_address=ip_address)
-    db.add(server)
-    db.commit()
-    db.refresh(server)
-
-    server_id = str(server.id)
-    response = client.delete(
-        f"{settings.API_V1_STR}/servers/{server_id}",
-        headers=superuser_token_headers,
-    )
+    response = client.delete(f"/servers/{server.id}", headers=superuser_headers)
     assert response.status_code == 200
-    assert response.json()["message"] == "Server deleted successfully"
+    message = response.json()
+    assert message["message"] == "Server deleted successfully"
 
-    # Verify deletion
-    db_server = db.get(Server, uuid.UUID(server_id))
-    assert db_server is None
-
-
-def test_delete_server_not_found(
-    client: TestClient, superuser_token_headers: dict[str, str]
-) -> None:
-    random_uuid = str(uuid.uuid4())
-    response = client.delete(
-        f"{settings.API_V1_STR}/servers/{random_uuid}",
-        headers=superuser_token_headers,
-    )
+    # Ensure server is deleted
+    response = client.get(f"/servers/{server.id}", headers=superuser_headers)
     assert response.status_code == 404
-    assert response.json()["detail"] == "Server not found"

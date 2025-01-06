@@ -24,6 +24,3 @@ def get_superuser_token_headers(client: TestClient) -> dict[str, str]:
     a_token = tokens["access_token"]
     headers = {"Authorization": f"Bearer {a_token}"}
     return headers
-
-def random_ip_address():
-    return "0.0.0.0"

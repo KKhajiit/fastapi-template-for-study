@@ -114,6 +114,27 @@ class NewPassword(SQLModel):
     new_password: str = Field(min_length=8, max_length=40)
     
     
-class Server(SQLModel, table=True):
+# Shared properties for Server
+class ServerBase(SQLModel):
+    ip_address: str = Field(unique=True, index=True, max_length=255)
+
+# Properties to receive via API on creation
+class ServerCreate(ServerBase):
+    pass
+
+# Properties to receive via API on update
+class ServerUpdate(ServerBase):
+    ip_address: str | None = Field(default=None, max_length=255)  # type: ignore
+
+# Database model, database table inferred from class name
+class Server(ServerBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    ip_address: str
+
+# Properties to return via API
+class ServerPublic(ServerBase):
+    id: uuid.UUID
+
+# For returning a list of servers via API
+class ServersPublic(SQLModel):
+    data: list[ServerPublic]
+    count: int

@@ -85,6 +85,15 @@ def get_server_by_ip(*, session: Session, ip_address: str) -> Server | None:
     return server
 
 
+def get_server_by_name(*, session: Session, name: str) -> Server | None:
+    """
+    Fetches a server record by its name.
+    """
+    statement = select(Server).where(Server.name == name)
+    server = session.exec(statement).first()
+    return server
+
+
 def delete_server(*, session: Session, db_server: Server) -> None:
     """
     Deletes an existing server record.

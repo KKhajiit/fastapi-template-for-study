@@ -117,6 +117,8 @@ class NewPassword(SQLModel):
 # Shared properties for Server
 class ServerBase(SQLModel):
     ip_address: str = Field(unique=True, index=True, max_length=255)
+    name: str = Field(max_length=100)  # Name 필드 추가
+    port: int = Field(ge=1, le=65535)  # Port 필드 추가, 범위는 1~65535
 
 # Properties to receive via API on creation
 class ServerCreate(ServerBase):
@@ -125,6 +127,8 @@ class ServerCreate(ServerBase):
 # Properties to receive via API on update
 class ServerUpdate(ServerBase):
     ip_address: str | None = Field(default=None, max_length=255)  # type: ignore
+    name: str | None = Field(default=None, max_length=100)  # Name 업데이트 가능
+    port: int | None = Field(default=None)  # Port 업데이트 가능
 
 # Database model, database table inferred from class name
 class Server(ServerBase, table=True):

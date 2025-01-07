@@ -43,11 +43,18 @@ def create_server(*, session: SessionDep, server_in: ServerCreate) -> Any:
     """
     Create a new server.
     """
-    existing_server = crud.get_server_by_ip(session=session, ip_address=server_in.ip_address)
-    if existing_server:
+    # 중복 검증: IP 주소, 이름, 포트
+    existing_server_ip = crud.get_server_by_ip(session=session, ip_address=server_in.ip_address)
+    if existing_server_ip:
         raise HTTPException(
             status_code=400,
             detail="A server with this IP address already exists in the system.",
+        )
+    existing_server_name = crud.get_server_by_name(session=session, name=server_in.name)
+    if existing_server_name:
+        raise HTTPException(
+            status_code=400,
+            detail="A server with this name already exists in the system.",
         )
 
     server = crud.create_server(session=session, server_create=server_in)

@@ -4,7 +4,7 @@ from sqlmodel import Session
 from app.models import Server, ServerCreate
 from app.main import app
 from app.api.deps import get_db
-from app.tests.utils.user import get_superuser_token_headers
+from app.tests.utils.utils import get_superuser_token_headers
 from app.tests.utils.server import create_random_server
 
 # Setup FastAPI test client

@@ -1,33 +1,48 @@
 import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
+from app.core.config import settings
 from app.models import Server, ServerCreate
 from app.main import app
 from app.api.deps import get_db
 from app.tests.utils.utils import get_superuser_token_headers
 from app.tests.utils.server import create_random_server
 
+
+def test_create_server(
+        client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    data = {"ip_address": "123.456.789.0"}
+    r = client.post(
+        f"{settings.API_V1_STR}/servers/",
+        headers=superuser_token_headers,
+        json=data,
+    )
+    assert 200 <= r.status_code < 300
+    created_server = r.json()
+    assert created_server["ip_address"] == "123.456.789.0"
+
 # Setup FastAPI test client
 client = TestClient(app)
 
 # Dependency override for test database session
-def override_get_db():
-    from app.tests.utils.session import get_test_session
-    yield from get_test_session()
+# def override_get_db():
+#     from app.tests.utils.session import get_test_session
+#     yield from get_test_session()
 
-app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_db] = get_db
 
 
-def test_create_server(session: Session):
-    superuser_headers = get_superuser_token_headers(client, session)
-    server_data = {
-        "ip_address": "192.168.1.1",
-    }
+# def test_create_server(session: Session):
+#     superuser_headers = get_superuser_token_headers(client, session)
+#     server_data = {
+#         "ip_address": "192.168.1.1",
+#     }
 
-    response = client.post("/servers/", json=server_data, headers=superuser_headers)
-    assert response.status_code == 200
-    created_server = response.json()
-    assert created_server["ip_address"] == server_data["ip_address"]
+#     response = client.post("/servers/", json=server_data, headers=superuser_headers)
+#     assert response.status_code == 200
+#     created_server = response.json()
+#     assert created_server["ip_address"] == server_data["ip_address"]
 
 
 def test_read_servers(session: Session):
